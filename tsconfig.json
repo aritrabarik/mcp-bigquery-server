@@ -9,9 +9,8 @@
         "strict": true,
         "outDir": "./dist",
         "rootDir": "./src",
-        "declaration": true,
-        "types": ["node", "dotenv"]
+        "declaration": true
     },
-    "include": ["src/**/*.ts"],
-    "exclude": ["node_modules", "dist"]
+    "include": ["src/**/*.ts", "node_modules/@types"],
+    "exclude": ["dist"]
 }

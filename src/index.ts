@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-/// <reference types="node" />
-/// <reference types="dotenv" />
 import dotenv from "dotenv";
 dotenv.config();
 

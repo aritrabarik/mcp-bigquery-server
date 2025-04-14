@@ -15,6 +15,23 @@ import { BigQuery } from "@google-cloud/bigquery";
 import { promises as fs, constants as fsConstants } from "fs";
 import path from "path";
 
+// Define interfaces for request types
+interface ReadResourceRequest {
+    params: {
+        uri: string;
+    };
+}
+
+interface CallToolRequest {
+    params: {
+        name: string;
+        arguments?: {
+            sql?: string;
+            maximumBytesBilled?: string;
+        };
+    };
+}
+
 // Define configuration interface
 interface ServerConfig {
     projectId: string;
@@ -229,31 +246,34 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     }
 });
 
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const resourceUrl = new URL(request.params.uri);
-    const pathComponents = resourceUrl.pathname.split("/");
-    const schema = pathComponents.pop();
-    const tableId = pathComponents.pop();
-    const datasetId = pathComponents.pop();
+server.setRequestHandler(
+    ReadResourceRequestSchema,
+    async (request: ReadResourceRequest) => {
+        const resourceUrl = new URL(request.params.uri);
+        const pathComponents = resourceUrl.pathname.split("/");
+        const schema = pathComponents.pop();
+        const tableId = pathComponents.pop();
+        const datasetId = pathComponents.pop();
 
-    if (schema !== SCHEMA_PATH) {
-        throw new Error("Invalid resource URI");
+        if (schema !== SCHEMA_PATH) {
+            throw new Error("Invalid resource URI");
+        }
+
+        const dataset = bigquery.dataset(datasetId!);
+        const table = dataset.table(tableId!);
+        const [metadata] = await table.getMetadata();
+
+        return {
+            contents: [
+                {
+                    uri: request.params.uri,
+                    mimeType: "application/json",
+                    text: JSON.stringify(metadata.schema.fields, null, 2),
+                },
+            ],
+        };
     }
-
-    const dataset = bigquery.dataset(datasetId!);
-    const table = dataset.table(tableId!);
-    const [metadata] = await table.getMetadata();
-
-    return {
-        contents: [
-            {
-                uri: request.params.uri,
-                mimeType: "application/json",
-                text: JSON.stringify(metadata.schema.fields, null, 2),
-            },
-        ],
-    };
-});
+);
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
@@ -277,43 +297,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name === "query") {
-        let sql = request.params.arguments?.sql as string;
-        let maximumBytesBilled =
-            request.params.arguments?.maximumBytesBilled || "1000000000";
+server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request: CallToolRequest) => {
+        if (request.params.name === "query") {
+            let sql = request.params.arguments?.sql as string;
+            let maximumBytesBilled =
+                request.params.arguments?.maximumBytesBilled || "1000000000";
 
-        // Validate read-only query
-        const forbiddenPattern =
-            /\b(INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|EXECUTE|BEGIN|COMMIT|ROLLBACK)\b/i;
-        if (forbiddenPattern.test(sql)) {
-            throw new Error("Only READ operations are allowed");
-        }
-
-        try {
-            // Qualify INFORMATION_SCHEMA queries
-            if (sql.toUpperCase().includes("INFORMATION_SCHEMA")) {
-                sql = qualifyTablePath(sql, config.projectId);
+            // Validate read-only query
+            const forbiddenPattern =
+                /\b(INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|EXECUTE|BEGIN|COMMIT|ROLLBACK)\b/i;
+            if (forbiddenPattern.test(sql)) {
+                throw new Error("Only READ operations are allowed");
             }
 
-            const [rows] = await bigquery.query({
-                query: sql,
-                location: config.location,
-                maximumBytesBilled: maximumBytesBilled.toString(),
-            });
+            try {
+                // Qualify INFORMATION_SCHEMA queries
+                if (sql.toUpperCase().includes("INFORMATION_SCHEMA")) {
+                    sql = qualifyTablePath(sql, config.projectId);
+                }
 
-            return {
-                content: [
-                    { type: "text", text: JSON.stringify(rows, null, 2) },
-                ],
-                isError: false,
-            };
-        } catch (error) {
-            throw error;
+                const [rows] = await bigquery.query({
+                    query: sql,
+                    location: config.location,
+                    maximumBytesBilled: maximumBytesBilled.toString(),
+                });
+
+                return {
+                    content: [
+                        { type: "text", text: JSON.stringify(rows, null, 2) },
+                    ],
+                    isError: false,
+                };
+            } catch (error) {
+                throw error;
+            }
         }
+        throw new Error(`Unknown tool: ${request.params.name}`);
     }
-    throw new Error(`Unknown tool: ${request.params.name}`);
-});
+);
 
 async function runServer() {
     try {

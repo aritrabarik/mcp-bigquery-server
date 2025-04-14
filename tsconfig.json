@@ -4,11 +4,13 @@
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
         "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true,
         "strict": true,
         "outDir": "./dist",
         "rootDir": "./src",
         "declaration": true,
-        "skipLibCheck": true
+        "types": ["node", "dotenv"]
     },
     "include": ["src/**/*.ts"],
     "exclude": ["node_modules", "dist"]

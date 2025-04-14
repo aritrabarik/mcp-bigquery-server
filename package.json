@@ -25,6 +25,7 @@
         "dotenv": "^16.5.0"
     },
     "devDependencies": {
+        "@types/dotenv": "^6.1.1",
         "@types/node": "^22.14.1",
         "shx": "^0.3.4",
         "typescript": "^5.8.3"

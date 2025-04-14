@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.3.0",
-    "@modelcontextprotocol/sdk": "0.6.0"
+    "@modelcontextprotocol/sdk": "0.6.0",
+    "dotenv": "^16.5.0"
   },
   "devDependencies": {
     "shx": "^0.3.4",

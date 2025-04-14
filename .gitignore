@@ -300,3 +300,7 @@ cython_debug/
 #.idea/
 
 .git/
+
+google_key.json
+.env
+.env.new

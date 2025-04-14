@@ -1,4 +1,3 @@
-// src/web-wrapper.ts
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
@@ -61,7 +60,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         isError: false,
     };
 });
-// HTTP wrapper
+// HTTP handler
 app.post("/execute", async (req, res) => {
     try {
         const parsed = CallToolRequestSchema.parse(req.body);
@@ -76,6 +75,7 @@ app.post("/execute", async (req, res) => {
         });
     }
 });
+// Start server with dummy transport
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log(`MCP BigQuery wrapper running at http://localhost:${port}`);

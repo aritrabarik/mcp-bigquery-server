@@ -7,6 +7,14 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { BigQuery } from "@google-cloud/bigquery";
 
+const DummyTransport = () => ({
+    connect: () => Promise.resolve(),
+    start: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+    onRequest: () => {},
+    send: () => Promise.resolve(),
+});
+
 const app = express();
 app.use(bodyParser.json());
 
@@ -94,6 +102,16 @@ app.post("/execute", async (req: Request, res: Response) => {
 
 // Start server with dummy transport
 const port = process.env.PORT || 8080;
-app.listen(port, () => {
-    console.log(`MCP BigQuery wrapper running at http://localhost:${port}`);
-});
+server
+    .connect(DummyTransport())
+    .then(() => {
+        app.listen(port, () => {
+            console.log(
+                `MCP BigQuery wrapper running at http://localhost:${port}`
+            );
+        });
+    })
+    .catch((err) => {
+        console.error("Failed to connect MCP server:", err);
+        process.exit(1);
+    });

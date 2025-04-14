@@ -89,7 +89,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 app.post("/execute", async (req: Request, res: Response) => {
     try {
         const parsed = CallToolRequestSchema.parse(req.body);
-        const result = await server.request(parsed, CallToolRequestSchema);
+        const result = await server.request(parsed, CallToolRequestSchema, {
+            timeout: 300_000, // 5 minutes (in ms)
+        });
+
         res.json(result);
     } catch (e) {
         console.error("Execution error:", e);

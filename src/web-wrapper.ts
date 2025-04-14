@@ -2,46 +2,95 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express from "express";
-import { spawn } from "child_process";
+import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
-import type { Request, Response } from "express";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { BigQuery } from "@google-cloud/bigquery";
 
 const app = express();
 app.use(bodyParser.json());
 
-app.post("/execute", (req: Request, res: Response) => {
-    const mcpProcess = spawn("node", ["dist/index.js"], {
-        env: process.env,
-        stdio: ["pipe", "pipe", "pipe"],
-    });
+const projectId = process.env.GOOGLE_PROJECT_ID!;
+const location = process.env.BIGQUERY_LOCATION || "US";
+const credentialsJson = JSON.parse(
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON!
+);
+const bigquery = new BigQuery({
+    projectId,
+    credentials: credentialsJson,
+});
 
-    let output = "";
-    let error = "";
+// Init MCP Server
+const server = new Server(
+    {
+        name: "mcp-server/bigquery",
+        version: "0.1.0",
+    },
+    {
+        capabilities: {
+            tools: {
+                query: {
+                    description: "Run a read-only BigQuery SQL query",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            sql: { type: "string" },
+                            maximumBytesBilled: {
+                                type: "string",
+                                optional: true,
+                            },
+                        },
+                    },
+                },
+            },
+            resources: {},
+        },
+    }
+);
 
-    mcpProcess.stdout.on("data", (data) => {
-        output += data.toString();
-    });
+// Tool handler
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name !== "query") {
+        throw new Error(`Unsupported tool: ${request.params.name}`);
+    }
 
-    mcpProcess.stderr.on("data", (data) => {
-        error += data.toString();
-        console.error("STDERR:", data.toString());
-    });
+    const sql = request.params.arguments?.sql;
+    if (!sql || typeof sql !== "string") {
+        throw new Error("Missing or invalid 'sql' argument");
+    }
 
-    mcpProcess.stdin.write(JSON.stringify(req.body) + "\n");
+    const maxBytes =
+        request.params.arguments?.maximumBytesBilled || "1000000000";
 
-    mcpProcess.stdout.on("end", () => {
-        try {
-            const parsed = JSON.parse(output);
-            res.json(parsed);
-        } catch (e) {
-            console.error("Failed to parse MCP response:", output);
-            res.status(500).send({
-                error: "Invalid response from MCP server",
-                raw: output,
-            });
-        }
-    });
+    const queryOptions = {
+        query: sql,
+        location,
+        maximumBytesBilled: typeof maxBytes === "string" ? maxBytes : undefined,
+    };
+
+    const [job] = await bigquery.createQueryJob(queryOptions);
+    const [rows] = await job.getQueryResults();
+
+    return {
+        content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
+        isError: false,
+    };
+});
+
+// HTTP wrapper
+app.post("/execute", async (req: Request, res: Response) => {
+    try {
+        const parsed = CallToolRequestSchema.parse(req.body);
+        const result = await server.request(parsed, CallToolRequestSchema);
+        res.json(result);
+    } catch (e) {
+        console.error("Execution error:", e);
+        res.status(500).json({
+            error: "Failed to execute query",
+            details: String(e),
+        });
+    }
 });
 
 const port = process.env.PORT || 8080;

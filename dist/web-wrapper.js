@@ -17,6 +17,15 @@ function qualifyInformationSchema(sql, projectId, dataset) {
     const pattern = /FROM\s+INFORMATION_SCHEMA\.TABLES/gi;
     return sql.replace(pattern, `FROM \`${projectId}.${dataset}.INFORMATION_SCHEMA.TABLES\``);
 }
+function formatAsMarkdownTable(rows) {
+    if (rows.length === 0)
+        return "No data found.";
+    const headers = Object.keys(rows[0]);
+    const headerLine = `| ${headers.join(" | ")} |`;
+    const separatorLine = `| ${headers.map(() => "---").join(" | ")} |`;
+    const rowLines = rows.map((row) => `| ${headers.map((key) => row[key] ?? "").join(" | ")} |`);
+    return [headerLine, separatorLine, ...rowLines].join("\n");
+}
 app.post("/execute", async (req, res) => {
     const payload = req.body;
     if (payload.method === "tools/list") {
@@ -61,7 +70,7 @@ app.post("/execute", async (req, res) => {
             content: [
                 {
                     type: "text",
-                    text: JSON.stringify(rows, null, 2),
+                    text: formatAsMarkdownTable(rows),
                 },
             ],
             isError: false,

@@ -31,6 +31,20 @@ function qualifyInformationSchema(
     );
 }
 
+function formatAsMarkdownTable(rows: any[]): string {
+    if (rows.length === 0) return "No data found.";
+
+    const headers = Object.keys(rows[0]);
+    const headerLine = `| ${headers.join(" | ")} |`;
+    const separatorLine = `| ${headers.map(() => "---").join(" | ")} |`;
+
+    const rowLines = rows.map(
+        (row) => `| ${headers.map((key) => row[key] ?? "").join(" | ")} |`
+    );
+
+    return [headerLine, separatorLine, ...rowLines].join("\n");
+}
+
 app.post("/execute", async (req: Request, res: Response): Promise<void> => {
     const payload = req.body;
 
@@ -86,7 +100,7 @@ app.post("/execute", async (req: Request, res: Response): Promise<void> => {
             content: [
                 {
                     type: "text",
-                    text: JSON.stringify(rows, null, 2),
+                    text: formatAsMarkdownTable(rows),
                 },
             ],
             isError: false,

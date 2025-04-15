@@ -15,6 +15,27 @@ const bigquery = new BigQuery({
 app.post("/execute", async (req, res) => {
     try {
         const payload = req.body;
+        if (req.body.method === "tools/list") {
+            res.json({
+                tools: [
+                    {
+                        name: "query",
+                        description: "Run a read-only BigQuery SQL query",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                sql: { type: "string" },
+                                maximumBytesBilled: {
+                                    type: "string",
+                                    description: "Optional query billing cap",
+                                },
+                            },
+                        },
+                    },
+                ],
+            });
+            return;
+        }
         // Basic MCP format validation
         if (payload.method !== "tools/call" ||
             !payload.params?.name ||
